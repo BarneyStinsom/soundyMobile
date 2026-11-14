@@ -77,8 +77,8 @@ function HomeConteudo() {
 
 const styles = StyleSheet.create({
   center: { flex: 1, textAlign: 'center', textAlignVertical: 'center', color: '#fff' },
-  title: { fontSize: 22, fontWeight: 'bold', padding: 16, color: '#fff' },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
+  title: { fontSize: 22, fontWeight: 'bold', padding: 16, paddingTop: 30, color: '#fff' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 15, gap: 12 },
   rank: { width: 24, fontWeight: 'bold', color: '#fff' },
   cover: { width: 48, height: 48, borderRadius: 6 },
   coverEmpty: { backgroundColor: '#ccc' },

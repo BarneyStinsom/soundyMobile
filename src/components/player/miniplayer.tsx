@@ -12,8 +12,8 @@ import {
   View,
 } from 'react-native';
 
-export default function MiniPlayer() {
-  const { currentSong, isPlaying, togglePlay, nextSong, position, duration, closePlayer } = usePlayer();
+export default function MiniPlayer({ bottom }: { bottom?: number }) {
+  const { currentSong, isPlaying, togglePlay, nextSong, previousSong, position, duration, closePlayer } = usePlayer();
   const router = useRouter();
 
   if (!currentSong) return null;
@@ -30,7 +30,7 @@ export default function MiniPlayer() {
   };
 
   return (
-    <View style={styles.outerContainer}>
+    <View style={[styles.outerContainer, bottom !== undefined && { bottom }]}>
       <Pressable onPress={handleOpenFullPlayer} style={styles.card}>
         {/* Barra de progresso discreta no topo do mini player */}
         <View style={styles.progressBackground}>
@@ -62,6 +62,16 @@ export default function MiniPlayer() {
             <Pressable
               onPress={(e) => {
                 e.stopPropagation();
+                  previousSong();
+                  }}
+                  style={styles.actionBtn}
+                  hitSlop={8}
+                  >
+  <Ionicons name="play-skip-back" size={20} color="#fff" />
+</Pressable>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
                 togglePlay();
               }}
               style={styles.actionBtn}
@@ -82,7 +92,7 @@ export default function MiniPlayer() {
               style={styles.actionBtn}
               hitSlop={8}
             >
-              <Ionicons name="play-skip-forward" size={20} color="rgba(255,255,255,0.8)" />
+              <Ionicons name="play-skip-forward" size={20} color="#fff" />
             </Pressable>
 
             <Pressable
@@ -93,12 +103,13 @@ export default function MiniPlayer() {
               style={styles.actionBtn}
               hitSlop={8}
             >
-              <Ionicons name="close" size={18} color="rgba(255,255,255,0.5)" />
+              <Ionicons name="close" size={18} color="#fff" />
             </Pressable>
           </View>
         </View>
       </Pressable>
     </View>
+    
   );
 }
 
@@ -111,10 +122,11 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   card: {
-    backgroundColor: '#270822',
+    backgroundColor: 'transparent',
+    backdropFilter: 'blur(5px)', 
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(224, 75, 192, 0.3)',
+    borderColor: 'rgba(0, 0, 0, 0.3)',
     overflow: 'hidden',
     shadowColor: '#e04bc0',
     shadowOffset: { width: 0, height: 4 },
@@ -129,7 +141,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#e04bc0',
+    backgroundColor: '#000000',
   },
   content: {
     flexDirection: 'row',
@@ -144,7 +156,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   coverPlaceholder: {
-    backgroundColor: '#1a0210',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
