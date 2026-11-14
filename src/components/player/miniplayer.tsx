@@ -12,8 +12,9 @@ import {
   View,
 } from 'react-native';
 
-export default function MiniPlayer() {
-  const { currentSong, isPlaying, togglePlay, nextSong, position, duration, closePlayer } = usePlayer();
+// bottom: distância da borda de baixo. Padrão = acima da barra de abas; em telas sem abas use ex. 12.
+export default function MiniPlayer({ bottom }: { bottom?: number }) {
+  const { currentSong, isPlaying, togglePlay, nextSong, previousSong, position, duration, closePlayer } = usePlayer();
   const router = useRouter();
 
   if (!currentSong) return null;
@@ -30,7 +31,7 @@ export default function MiniPlayer() {
   };
 
   return (
-    <View style={styles.outerContainer}>
+    <View style={[styles.outerContainer, bottom !== undefined && { bottom }]}>
       <Pressable onPress={handleOpenFullPlayer} style={styles.card}>
         {/* Barra de progresso discreta no topo do mini player */}
         <View style={styles.progressBackground}>
@@ -59,6 +60,17 @@ export default function MiniPlayer() {
 
           {/* Botões de Ação */}
           <View style={styles.actions}>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                previousSong();
+              }}
+              style={styles.actionBtn}
+              hitSlop={8}
+            >
+              <Ionicons name="play-skip-back" size={20} color="rgba(255,255,255,0.8)" />
+            </Pressable>
+
             <Pressable
               onPress={(e) => {
                 e.stopPropagation();

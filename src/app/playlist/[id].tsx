@@ -1,6 +1,7 @@
 // src/app/playlist/[id].tsx — espelha pgMusicas.html?tipo=playlist: músicas da playlist,
 // remover música e "+ Adicionar músicas".
 import { Botao, Capa, Mensagem } from '@/components/ui';
+import MiniPlayer from '@/components/player/miniplayer';
 import Tela from '@/components/Tela';
 import { Song, parseDuration, usePlayer } from '@/contexts/playerContext';
 import { useAuth } from '@/contexts/authcontext';
@@ -114,7 +115,7 @@ function PlaylistConteudo() {
       <FlatList
         data={itens}
         keyExtractor={(i) => i.id}
-        contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 20, paddingBottom: 110 }}
         ListHeaderComponent={
           <View style={{ marginBottom: 12 }}>
             <Pressable onPress={() => router.back()} style={s.voltar} hitSlop={10}>
@@ -150,6 +151,9 @@ function PlaylistConteudo() {
           </Pressable>
         )}
       />
+
+      {/* esta tela fica fora das abas, então o mini player é desenhado aqui (sem barra de abas embaixo) */}
+      {!adicionar && <MiniPlayer bottom={12} />}
 
       <Modal visible={adicionar} animationType="slide" onRequestClose={() => setAdicionar(false)}>
         <SafeAreaView style={s.modalTela}>
