@@ -1,9 +1,11 @@
 // src/app/(tabs)/index.tsx
+import Tela from '@/components/Tela';
+import { usePlayer } from '@/contexts/playerContext';
 import { api } from '@/services/api';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View,
+  ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View,
 } from 'react-native';
 
 type TopSong = {
@@ -13,12 +15,14 @@ type TopSong = {
   artistName?: string;
   songCoverUrl?: string | null;
   playCount: number;
+  duration?: number | string;
 };
 
-export default function Home() {
+function HomeConteudo() {
   const [songs, setSongs] = useState<TopSong[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { playSong } = usePlayer();
 
   useEffect(() => {
     async function loadTopHits() {
@@ -34,18 +38,23 @@ export default function Home() {
     loadTopHits();
   }, []);
 
-  if (loading) return <ActivityIndicator style={styles.center} size="large" />;
+  if (loading) return <ActivityIndicator style={styles.center} size="large" color="#b91d92" />;
   if (error) return <Text style={styles.center}>{error}</Text>;
 
   return (
     <FlatList
       data={songs}
-      keyExtractor={(song) => song.songId}
+      keyExtractor={(song) => song.songId || song.id}
       ListHeaderComponent={<Text style={styles.title}>Em alta no mundo!</Text>}
+      contentContainerStyle={{ paddingBottom: 100, backgroundColor: 'transparent' }}
+      style={{ backgroundColor: 'transparent' }}
       renderItem={({ item, index }) => (
         <Pressable
           style={styles.row}
-         onPress={() => router.push({ pathname: '/player/[id]', params: { id: item.songId } })}
+          onPress={() => {
+            playSong(item, songs);
+            router.push({ pathname: '/player/[id]', params: { id: item.songId || item.id } });
+          }}
         >
           <Text style={styles.rank}>{index + 1}</Text>
           {item.songCoverUrl ? (
@@ -67,14 +76,22 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, textAlign: 'center', textAlignVertical: 'center' },
-  title: { fontSize: 22, fontWeight: 'bold', padding: 16 },
+  center: { flex: 1, textAlign: 'center', textAlignVertical: 'center', color: '#fff' },
+  title: { fontSize: 22, fontWeight: 'bold', padding: 16, color: '#fff' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 12 },
-  rank: { width: 24, fontWeight: 'bold' },
+  rank: { width: 24, fontWeight: 'bold', color: '#fff' },
   cover: { width: 48, height: 48, borderRadius: 6 },
   coverEmpty: { backgroundColor: '#ccc' },
   info: { flex: 1 },
-  name: { fontSize: 16, fontWeight: '600' },
-  artist: { color: '#666' },
-  plays: { fontSize: 12, color: '#666' },
+  name: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  artist: { color: '#ccc' },
+  plays: { fontSize: 12, color: '#ccc' },
 });
+
+export default function Home() {
+  return (
+    <Tela>
+      <HomeConteudo />
+    </Tela>
+  );
+}
