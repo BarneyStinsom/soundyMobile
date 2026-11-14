@@ -10,7 +10,6 @@ import { api, ApiError } from '@/services/api';
 import { cores } from '@/theme';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import MiniPlayer from '@/components/player/miniplayer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList, Modal, Pressable, SafeAreaView, StyleSheet, Text, TextInput, View,

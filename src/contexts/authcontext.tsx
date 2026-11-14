@@ -1,4 +1,5 @@
-// src/contexts/authContext.tsx
+// src/contexts/authcontext.tsx
+import { garantirCurtidas } from '@/lib/curtidas';
 import { api } from '@/services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
@@ -32,7 +33,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async function restore() {
       try {
         const saved = await AsyncStorage.getItem(STORAGE_KEY);
-        if (saved) setUser(JSON.parse(saved));
+        if (saved) {
+          const u: User = JSON.parse(saved);
+          setUser(u);
+          // contas que já existiam também ganham a playlist (sem travar a abertura do app)
+          garantirCurtidas(u.id).catch((e) => console.warn('Playlist de curtidas:', e));
+        }
       } catch {
         // storage corrompido: segue deslogado
       } finally {
@@ -52,6 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       '/users/login',
       { method: 'POST', body: JSON.stringify({ email: email.trim(), password }) },
     );
+    try {
+      await garantirCurtidas(data.id);
+    } catch (e) {
+      console.warn('Playlist de curtidas:', e);
+    }
+
     await persist({
       id: data.id,
       name: data.name,
@@ -65,6 +77,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: 'POST',
       body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
     });
+
+    // cria a playlist base "Músicas curtidas"; se falhar, o cadastro continua
+    // e ela é criada na primeira vez que a pessoa curtir uma música
+    try {
+      await garantirCurtidas(data.id);
+    } catch (e) {
+      console.warn('Não foi possível criar a playlist de curtidas:', e);
+    }
+
     await persist({ id: data.id, name: data.name ?? name, email: data.email ?? email, isAdmin: false });
   }
 

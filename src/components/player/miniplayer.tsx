@@ -12,10 +12,6 @@ import {
   View,
 } from 'react-native';
 
-<<<<<<< HEAD
-=======
-// bottom: distância da borda de baixo. Padrão = acima da barra de abas; em telas sem abas use ex. 12.
->>>>>>> 36c1ec75b99926d29c17864477a31c103f1798da
 export default function MiniPlayer({ bottom }: { bottom?: number }) {
   const { currentSong, isPlaying, togglePlay, nextSong, previousSong, position, duration, closePlayer } = usePlayer();
   const router = useRouter();

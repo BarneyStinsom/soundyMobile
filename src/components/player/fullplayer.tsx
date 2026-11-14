@@ -1,13 +1,17 @@
 // src/components/player/fullplayer.tsx
 import PlayerControls from '@/components/player/PlayerControls';
-import { getSongArtist, getSongCover, Song, usePlayer } from '@/contexts/playerContext';
+import { useAuth } from '@/contexts/authcontext';
+import { getSongArtist, getSongCover, getSongId, Song, usePlayer } from '@/contexts/playerContext';
+import { buscarCurtida, curtir, descurtir } from '@/lib/curtidas';
 import { api } from '@/services/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  PanResponder,
+  Platform,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -28,8 +32,66 @@ function formatTime(seconds: number): string {
 export default function FullPlayer({ songId }: FullPlayerProps) {
   const router = useRouter();
   const { currentSong, position, duration, seekTo, playSong } = usePlayer();
+  const { user } = useAuth();
+
+  // TODOS os hooks ficam aqui em cima, antes de qualquer "return" antecipado
   const [isLiked, setIsLiked] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [dragRatio, setDragRatio] = useState<number | null>(null); // 0..1 enquanto arrasta
+  const [salvandoCurtida, setSalvandoCurtida] = useState(false);
+  const [erroCurtida, setErroCurtida] = useState('');
+  const tocouCoracaoRef = useRef(false); // se a pessoa já mexeu no coração nesta música
+  const songKey = currentSong ? getSongId(currentSong) : '';
+
+  // refs: o PanResponder é criado uma vez só, então precisa ler valores sempre atuais daqui
+  const barWidthRef = useRef(0);
+  const startXRef = useRef(0);
+  const durationRef = useRef(0);
+  const seekRef = useRef(seekTo);
+  durationRef.current = duration;
+  seekRef.current = seekTo;
+
+  const ratioFromX = (x: number) =>
+    barWidthRef.current > 0 ? Math.max(0, Math.min(1, x / barWidthRef.current)) : 0;
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      // encosta na barra: já mostra a posição (serve também pro toque simples)
+      onPanResponderGrant: (e) => {
+        startXRef.current = e.nativeEvent.locationX;
+        setDragRatio(ratioFromX(startXRef.current));
+      },
+      // arrastando: ponto inicial + deslocamento do dedo
+      onPanResponderMove: (_e, g) => {
+        setDragRatio(ratioFromX(startXRef.current + g.dx));
+      },
+      // soltou: só aqui pula a música pro ponto escolhido
+      onPanResponderRelease: (_e, g) => {
+        const r = ratioFromX(startXRef.current + g.dx);
+        seekRef.current(r * durationRef.current);
+        setDragRatio(null);
+      },
+      onPanResponderTerminate: () => setDragRatio(null),
+    })
+  ).current;
+
+  // Ao trocar de música, confere se ela já está na playlist "Músicas curtidas"
+  useEffect(() => {
+    tocouCoracaoRef.current = false;
+    setErroCurtida('');
+    if (!user || !songKey) { setIsLiked(false); return; }
+    let cancelado = false;
+    buscarCurtida(user.id, songKey)
+      .then((r) => {
+        // se a pessoa já tocou no coração enquanto carregava, não desfaz o toque dela
+        if (!cancelado && !tocouCoracaoRef.current) setIsLiked(!!r.itemId);
+      })
+      .catch((e) => console.warn('Erro ao checar curtida:', e));
+    return () => { cancelado = true; };
+  }, [user?.id, songKey]);
 
   // Se a página do player for aberta diretamente via ID de URL diferente do currentSong
   useEffect(() => {
@@ -55,10 +117,43 @@ export default function FullPlayer({ songId }: FullPlayerProps) {
     loadSongDetails();
   }, [songId]);
 
+  // coração: adiciona/remove da playlist "Músicas curtidas"
+  async function alternarCurtida() {
+    if (!user) { setErroCurtida('Você precisa estar logado para curtir.'); return; }
+    if (!songKey) { setErroCurtida('Não foi possível identificar a música.'); return; }
+    if (salvandoCurtida) return;
+
+    tocouCoracaoRef.current = true;
+    const novo = !isLiked;
+    setIsLiked(novo); // responde na hora; se der erro, desfaz
+    setErroCurtida('');
+    setSalvandoCurtida(true);
+    try {
+      const { playlistId, itemId } = await buscarCurtida(user.id, songKey);
+      console.log('[curtir]', { novo, songKey, playlistId, itemId });
+      if (novo && !itemId) await curtir(playlistId, songKey);
+      if (!novo && itemId) await descurtir(itemId);
+    } catch (e) {
+      console.error('Erro ao curtir:', e);
+      setErroCurtida(e instanceof Error ? e.message : 'Não foi possível curtir a música.');
+      setIsLiked(!novo);
+    } finally {
+      setSalvandoCurtida(false);
+    }
+  }
+
+  // volta se houver tela anterior; senão (ex.: página recarregada na web) vai pro início
+  function voltar() {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }
+
   const activeSong = currentSong;
   const cover = activeSong ? getSongCover(activeSong) : null;
   const artist = activeSong ? getSongArtist(activeSong) : '';
-  const progressPercent = duration > 0 ? (position / duration) * 100 : 0;
+  const progressPercent =
+    dragRatio !== null ? dragRatio * 100 : duration > 0 ? (position / duration) * 100 : 0;
+  const shownPosition = dragRatio !== null ? dragRatio * duration : position;
 
   if (loading) {
     return (
@@ -72,7 +167,7 @@ export default function FullPlayer({ songId }: FullPlayerProps) {
     return (
       <SafeAreaView style={styles.centerContainer}>
         <Text style={styles.emptyText}>Nenhuma música selecionada</Text>
-        <Pressable onPress={() => router.back()} style={styles.backButtonSimple}>
+        <Pressable onPress={voltar} style={styles.backButtonSimple}>
           <Text style={styles.backButtonText}>Voltar</Text>
         </Pressable>
       </SafeAreaView>
@@ -80,10 +175,11 @@ export default function FullPlayer({ songId }: FullPlayerProps) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
       {/* Top Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.headerBtn} hitSlop={12}>
+        <Pressable onPress={voltar} style={styles.headerBtn} hitSlop={12}>
           <Ionicons name="chevron-down" size={28} color="#ffffff" />
         </Pressable>
         <View style={styles.headerTitleContainer}>
@@ -118,7 +214,7 @@ export default function FullPlayer({ songId }: FullPlayerProps) {
             {artist}
           </Text>
         </View>
-        <Pressable onPress={() => setIsLiked(!isLiked)} style={styles.heartBtn} hitSlop={10}>
+        <Pressable onPress={alternarCurtida} style={styles.heartBtn} hitSlop={10}>
           <Ionicons
             name={isLiked ? 'heart' : 'heart-outline'}
             size={26}
@@ -127,25 +223,29 @@ export default function FullPlayer({ songId }: FullPlayerProps) {
         </Pressable>
       </View>
 
+      {!!erroCurtida && <Text style={styles.erroCurtida}>{erroCurtida}</Text>}
+
       {/* Progress Bar Section */}
       <View style={styles.progressContainer}>
-        <Pressable
+        <View
           style={styles.progressBarTouchArea}
-          onPress={(e) => {
-            const { locationX } = e.nativeEvent;
-            // aproximação de seek ao clicar na barra
-            const barWidth = 320; // largura estimada
-            const ratio = Math.max(0, Math.min(1, locationX / barWidth));
-            seekTo(ratio * duration);
-          }}
+          onLayout={(e) => { barWidthRef.current = e.nativeEvent.layout.width; }}
+          {...panResponder.panHandlers}
         >
-          <View style={styles.progressBarTrack}>
+          {/* pointerEvents none: o toque é sempre lido na área da barra, não nos filhos */}
+          <View style={styles.progressBarTrack} pointerEvents="none">
             <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
-            <View style={[styles.progressKnob, { left: `${progressPercent}%` }]} />
+            <View
+              style={[
+                styles.progressKnob,
+                dragRatio !== null && styles.progressKnobActive,
+                { left: `${progressPercent}%` },
+              ]}
+            />
           </View>
-        </Pressable>
+        </View>
         <View style={styles.timeRow}>
-          <Text style={styles.timeText}>{formatTime(position)}</Text>
+          <Text style={styles.timeText}>{formatTime(shownPosition)}</Text>
           <Text style={styles.timeText}>{formatTime(duration)}</Text>
         </View>
       </View>
@@ -164,16 +264,20 @@ export default function FullPlayer({ songId }: FullPlayerProps) {
           <Ionicons name="list" size={22} color="rgba(255, 255, 255, 0.6)" />
         </Pressable>
       </View>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
     backgroundColor: '#12020d',
+  },
+  container: {
+    flex: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
     paddingBottom: 24,
   },
   centerContainer: {
@@ -268,11 +372,17 @@ const styles = StyleSheet.create({
   heartBtn: {
     padding: 4,
   },
+  erroCurtida: {
+    color: '#ff8a8a',
+    fontSize: 13,
+    marginTop: 6,
+  },
   progressContainer: {
     marginVertical: 16,
   },
   progressBarTouchArea: {
-    paddingVertical: 8,
+    paddingVertical: 16, // área de toque maior, fica mais fácil de pegar
+    ...(Platform.OS === 'web' ? ({ touchAction: 'none', userSelect: 'none', cursor: 'pointer' } as any) : {}),
   },
   progressBarTrack: {
     height: 4,
@@ -293,6 +403,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#ffffff',
     marginLeft: -6,
+  },
+  progressKnobActive: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginLeft: -9,
+    top: -7,
   },
   timeRow: {
     flexDirection: 'row',
