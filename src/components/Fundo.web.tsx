@@ -15,7 +15,7 @@ const PATHS = Array.from({ length: TOTAL }, (_, i) => {
   }
   return {
     d,
-    duration: 9 + i * 0.4,
+    duration: 9 + i * 0.5,
     delay: -i * 0.6,
     opacity: 0.12 + (i % 12) * 0.045,
   };
